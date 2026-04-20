@@ -1,0 +1,16 @@
+<main class="shell">
+  <header>
+    <div class="title">
+      <h1>IT Passport Exam Platform</h1>
+      <p>Practice mock tests, submit answers, and track mastery by topic.</p>
+    </div>
+    <nav>
+      <a routerLink="/">Home</a>
+      <button class="theme-toggle" type="button" (click)="toggleTheme()">
+        {{ isDarkMode ? 'Light mode' : 'Dark mode' }}
+      </button>
+    </nav>
+  </header>
+
+  <router-outlet />
+</main>
