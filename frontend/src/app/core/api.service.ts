@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Exam, ProgressSummary, SessionResult, StartSessionResponse, Topic } from './api.types';
+import { Exam, InProgressSession, Learner, ProgressSummary, SessionResult, StartSessionResponse, Topic } from './api.types';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -26,6 +26,14 @@ export class ApiService {
     return this.http.post<Exam>(`${this.baseUrl}/exams`, payload);
   }
 
+  createLearner(): Observable<Learner> {
+    return this.http.post<Learner>(`${this.baseUrl}/learners`, {});
+  }
+
+  getLearner(id: number): Observable<Learner> {
+    return this.http.get<Learner>(`${this.baseUrl}/learners/${id}`);
+  }
+
   startSession(userId: number, examId: number): Observable<StartSessionResponse> {
     return this.http.post<StartSessionResponse>(`${this.baseUrl}/sessions/start`, {
       user_id: userId,
@@ -33,10 +41,27 @@ export class ApiService {
     });
   }
 
+  saveProgress(
+    sessionId: number,
+    userId: number,
+    currentIndex: number,
+    answers: Array<{ question_id: number; selected_option_id: number | null }>
+  ): Observable<unknown> {
+    return this.http.post(`${this.baseUrl}/sessions/${sessionId}/progress`, {
+      user_id: userId,
+      current_question_index: currentIndex,
+      answers,
+    });
+  }
+
   submitSession(sessionId: number, answers: Array<{ question_id: number; selected_option_id: number | null }>): Observable<SessionResult> {
     return this.http.post<SessionResult>(`${this.baseUrl}/sessions/${sessionId}/submit`, {
       answers,
     });
+  }
+
+  getInProgressSessions(userId: number): Observable<InProgressSession[]> {
+    return this.http.get<InProgressSession[]>(`${this.baseUrl}/users/${userId}/sessions/in-progress`);
   }
 
   getProgress(userId: number): Observable<ProgressSummary> {

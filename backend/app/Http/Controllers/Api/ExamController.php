@@ -56,7 +56,7 @@ class ExamController extends Controller
 
         if (! Learner::query()->whereKey($validated['user_id'])->exists()) {
             throw ValidationException::withMessages([
-                'user_id' => 'The selected user does not exist in table user.',
+                'user_id' => 'The selected learner does not exist.',
             ]);
         }
 

@@ -38,6 +38,15 @@ export interface Exam {
 
 export interface StartSessionResponse {
   session_id: number;
+  resumed: boolean;
+  progress: {
+    current_question_index: number;
+    answers: Array<{
+      question_id: number;
+      selected_option_id: number | null;
+    }>;
+    saved_at: string | null;
+  };
   exam: {
     id: number;
     title: string;
@@ -55,6 +64,7 @@ export interface SessionResult {
 }
 
 export interface ProgressSummary {
+  pass_score: number;
   user: {
     id: number;
     name: string;
@@ -85,4 +95,34 @@ export interface ProgressSummary {
     mastery_percent: number;
     last_attempted_at: string;
   }>;
+  exam_attempts: Array<{
+    exam_id: number;
+    exam_title: string;
+    attempts: number;
+    passed_attempts: number;
+    pass_rate: number;
+  }>;
+}
+
+export interface Learner {
+  id: number;
+  name: string;
+  session_number: number;
+  score: number;
+  timestamp: string;
+}
+
+export interface InProgressSession {
+  id: number;
+  user_id: number;
+  exam_id: number;
+  current_question_index: number;
+  total_questions: number;
+  updated_at: string;
+  exam: {
+    id: number;
+    title: string;
+    description: string;
+    total_questions: number;
+  };
 }

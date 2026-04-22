@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 class Learner extends Model
 {
-    public $timestamps = false;
+    protected $table = 'learners';
 
     protected $fillable = [
         'name',
@@ -25,10 +25,5 @@ class Learner extends Model
     public function sessions(): HasMany
     {
         return $this->hasMany(ExamSession::class, 'user_id');
-    }
-
-    public function getTable(): string
-    {
-        return Schema::hasTable('user') ? 'user' : 'users';
     }
 }

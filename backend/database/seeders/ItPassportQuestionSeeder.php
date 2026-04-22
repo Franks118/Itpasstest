@@ -381,37 +381,19 @@ class ItPassportQuestionSeeder extends Seeder
 
     private function ensureCreator(): int
     {
-        $table = Schema::hasTable('user') ? 'user' : 'users';
+        $table = 'learners';
         $existing = DB::table($table)->orderBy('id')->value('id');
         if ($existing) {
             return (int) $existing;
         }
 
-        $columns = collect(Schema::getColumnListing($table));
-        $payload = ['name' => 'IT Passport Learner'];
-
-        if ($columns->contains('session_number')) {
-            $payload['session_number'] = 1;
-        }
-        if ($columns->contains('score')) {
-            $payload['score'] = 0;
-        }
-        if ($columns->contains('timestamp')) {
-            $payload['timestamp'] = now();
-        }
-        if ($columns->contains('email')) {
-            $payload['email'] = 'itpassport@example.com';
-        }
-        if ($columns->contains('password')) {
-            $payload['password'] = 'seeded-password';
-        }
-        if ($columns->contains('created_at')) {
-            $payload['created_at'] = now();
-        }
-        if ($columns->contains('updated_at')) {
-            $payload['updated_at'] = now();
-        }
-
-        return (int) DB::table($table)->insertGetId($payload);
+        return (int) DB::table($table)->insertGetId([
+            'name' => 'IT Passport Official',
+            'session_number' => 1,
+            'score' => 0,
+            'timestamp' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }
