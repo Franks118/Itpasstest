@@ -4,7 +4,7 @@ import { Component, OnInit, effect, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiService } from '../core/api.service';
-import { SessionResult, StartSessionResponse } from '../core/api.types';
+import { DetailedSession, RevealAnswerResponse, SessionResult, StartSessionResponse } from '../core/api.types';
 import { LearnerService } from '../core/learner.service';
 
 @Component({
@@ -13,7 +13,8 @@ import { LearnerService } from '../core/learner.service';
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <section class="exam-page">
-      <div *ngIf="session() && !result()" class="exam-container">
+      <!-- Active Exam Mode -->
+      <div *ngIf="session() && !result() && !review()" class="exam-container">
         <header class="exam-header-meta">
           <div class="header-left">
             <a routerLink="/" class="back-link">
@@ -42,40 +43,58 @@ import { LearnerService } from '../core/learner.service';
           <div class="options-grid">
             <label *ngFor="let option of currentQuestion.options" 
                    class="option-item" 
-                   [class.selected]="answers[currentQuestion.id!] === option.id">
+                   [class.selected]="answers[currentQuestion.id!] === option.id"
+                   [class.revealed-correct]="revealed[currentQuestion.id!]?.correct_option_id === option.id">
               <input
                 type="radio"
                 [name]="'q-' + currentQuestion.id"
                 [value]="option.id"
                 [checked]="answers[currentQuestion.id!] === option.id"
                 (change)="pick(currentQuestion.id!, option.id ?? null)"
+                [disabled]="!!revealed[currentQuestion.id!]"
               />
               <span class="option-text">{{ option.option_text }}</span>
             </label>
           </div>
+
+          <!-- Revealed Answer Feedback -->
+          <div *ngIf="revealed[currentQuestion.id!] as info" class="reveal-feedback card">
+            <div class="reveal-header">
+              <span class="pill success">Correct Answer Revealed</span>
+            </div>
+            <p class="explanation" *ngIf="info.explanation"><strong>Explanation:</strong> {{ info.explanation }}</p>
+          </div>
         </div>
 
         <footer class="exam-footer">
-          <button class="btn btn-secondary" (click)="prev()" [disabled]="currentIndex === 0">Previous</button>
+          <div class="footer-left">
+            <button class="btn btn-secondary" (click)="prev()" [disabled]="currentIndex === 0">Previous</button>
+            <button class="btn btn-secondary reveal-btn" (click)="showAnswer()" *ngIf="currentQuestion && !revealed[currentQuestion.id!]">
+              Show Answer
+            </button>
+          </div>
           
           <div class="footer-center">
             <span class="save-status" *ngIf="lastSaved()">Auto-saved at {{ lastSaved() | date:'shortTime' }}</span>
           </div>
 
-          <button *ngIf="currentIndex < (session()?.exam?.questions?.length || 0) - 1" 
-                  class="btn btn-primary" 
-                  (click)="next()">Next</button>
-          
-          <button *ngIf="currentIndex === (session()?.exam?.questions?.length || 0) - 1"
-                  class="btn btn-primary submit-btn"
-                  (click)="submit()"
-                  [disabled]="submitted">
-            Submit Exam
-          </button>
+          <div class="footer-right">
+            <button *ngIf="currentIndex < (session()?.exam?.questions?.length || 0) - 1" 
+                    class="btn btn-primary" 
+                    (click)="next()">Next</button>
+            
+            <button *ngIf="currentIndex === (session()?.exam?.questions?.length || 0) - 1"
+                    class="btn btn-primary submit-btn"
+                    (click)="submit()"
+                    [disabled]="submitted">
+              Submit Exam
+            </button>
+          </div>
         </footer>
       </div>
 
-      <div *ngIf="result()" class="result-container card">
+      <!-- Simple Result Summary -->
+      <div *ngIf="result() && !review()" class="result-container card">
         <div class="result-header">
           <div class="result-icon" [class.pass]="(result()?.score || 0) >= 80">
             <svg *ngIf="(result()?.score || 0) >= 80" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
@@ -97,9 +116,53 @@ import { LearnerService } from '../core/learner.service';
         </div>
 
         <div class="result-actions">
-          <a routerLink="/" class="btn btn-primary">Back to Home</a>
-          <a [routerLink]="['/progress', learnerService.learner()?.id]" class="btn btn-secondary">Detailed Progress</a>
+          <button class="btn btn-primary" (click)="loadReview()">Review All Answers</button>
+          <a routerLink="/" class="btn btn-secondary">Back to Home</a>
         </div>
+      </div>
+
+      <!-- Detailed Review Mode -->
+      <div *ngIf="review() as data" class="review-container">
+        <header class="review-header-meta">
+          <h1>Review: {{ data.exam.title }}</h1>
+          <div class="review-summary-pill pill">
+            {{ data.session.correct_answers }}/{{ data.session.total_questions }} ({{ data.session.score }}%)
+          </div>
+        </header>
+
+        <div class="review-list">
+          <article *ngFor="let q of data.exam.questions; let i = index" class="card review-card" [class.wrong]="!q.is_correct">
+            <div class="review-q-header">
+              <span class="q-num">#{{ i + 1 }}</span>
+              <span class="topic-tag">{{ q.topic_name }}</span>
+              <span class="pill" [class.success]="q.is_correct" [class.error]="!q.is_correct">
+                {{ q.is_correct ? 'Correct' : 'Incorrect' }}
+              </span>
+            </div>
+            
+            <p class="question-text">{{ q.question_text }}</p>
+
+            <div class="review-options">
+              <div *ngFor="let opt of q.options" 
+                   class="review-option-item"
+                   [class.correct-answer]="opt.is_correct"
+                   [class.user-wrong]="q.selected_option_id === opt.id && !opt.is_correct">
+                <span class="marker"></span>
+                {{ opt.option_text }}
+              </div>
+            </div>
+
+            <div class="review-explanation card" *ngIf="q.explanation">
+              <strong>Explanation:</strong>
+              <p>{{ q.explanation }}</p>
+            </div>
+          </article>
+        </div>
+
+        <footer class="review-footer">
+          <a routerLink="/" class="btn btn-primary">Back to Home</a>
+          <a [routerLink]="['/progress', learnerService.learner()?.id]" class="btn btn-secondary">My Dashboard</a>
+        </footer>
       </div>
 
       <div *ngIf="error()" class="error-container card">
@@ -107,7 +170,7 @@ import { LearnerService } from '../core/learner.service';
         <a routerLink="/" class="btn btn-secondary">Return Home</a>
       </div>
 
-      <div *ngIf="!session() && !error() && !result()" class="loading-container">
+      <div *ngIf="!session() && !error() && !result() && !review()" class="loading-container">
         <div class="spinner"></div>
         <p>Preparing your exam session...</p>
       </div>
@@ -116,7 +179,7 @@ import { LearnerService } from '../core/learner.service';
   styles: [`
     .exam-page { max-width: 800px; margin: 0 auto; }
     
-    .exam-header-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .exam-header-meta, .review-header-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
     .header-left { display: flex; align-items: center; gap: 1.5rem; }
     .header-left h1 { font-size: 1.25rem; }
     .back-link { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
@@ -125,7 +188,7 @@ import { LearnerService } from '../core/learner.service';
     .progress-bar-container { height: 8px; background: var(--border-color); border-radius: 99px; overflow: hidden; margin-bottom: 2.5rem; }
     .progress-bar-fill { height: 100%; background: var(--accent-primary); transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
 
-    .question-card { padding: 2.5rem; margin-bottom: 2rem; }
+    .question-card { padding: 2.5rem; margin-bottom: 2rem; position: relative; }
     .question-header { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; }
     .topic-tag { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
     .difficulty-tag { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; border-radius: 4px; padding: 1px 6px; }
@@ -139,10 +202,19 @@ import { LearnerService } from '../core/learner.service';
     .option-item { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; border: 1px solid var(--border-color); border-radius: 12px; cursor: pointer; transition: all 0.2s ease; }
     .option-item:hover { background: var(--surface-hover); border-color: var(--text-muted); }
     .option-item.selected { border-color: var(--accent-primary); background: var(--accent-soft); }
+    .option-item.revealed-correct { border-color: var(--success-text); background: var(--success-bg); color: var(--success-text); font-weight: 700; }
     .option-item input { width: 18px; height: 18px; accent-color: var(--accent-primary); }
     .option-text { font-size: 1rem; font-weight: 500; }
 
+    .reveal-feedback { margin-top: 2rem; background: var(--bg-color); padding: 1.25rem; border-style: dashed; }
+    .reveal-header { margin-bottom: 0.75rem; }
+    .pill.success { background: var(--success-bg); color: var(--success-text); }
+    .explanation { font-size: 0.95rem; color: var(--text-muted); line-height: 1.6; }
+
     .exam-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 3rem; }
+    .footer-left { display: flex; gap: 0.75rem; }
+    .reveal-btn { color: var(--accent-primary); border-color: var(--accent-primary); }
+    .reveal-btn:hover { background: var(--accent-soft); }
     .save-status { font-size: 0.75rem; color: var(--text-muted); }
 
     .result-container { text-align: center; padding: 4rem 2rem; }
@@ -155,6 +227,20 @@ import { LearnerService } from '../core/learner.service';
     .stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
     .result-actions { display: flex; justify-content: center; gap: 1rem; }
 
+    /* Review Styles */
+    .review-header-meta h1 { font-size: 1.5rem; }
+    .review-list { display: grid; gap: 1.5rem; margin-bottom: 3rem; }
+    .review-card { padding: 2rem; }
+    .review-card.wrong { border-left: 4px solid var(--error-text); }
+    .review-q-header { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+    .q-num { font-weight: 800; color: var(--accent-primary); }
+    .review-options { display: grid; gap: 0.5rem; margin: 1.5rem 0; }
+    .review-option-item { padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.75rem; font-size: 0.95rem; }
+    .review-option-item.correct-answer { border-color: var(--success-text); background: var(--success-bg); color: var(--success-text); font-weight: 700; }
+    .review-option-item.user-wrong { border-color: var(--error-text); background: rgba(239, 68, 68, 0.05); color: var(--error-text); }
+    .review-explanation { background: var(--bg-color); border: none; font-size: 0.9rem; color: var(--text-muted); margin-top: 1rem; }
+    .review-footer { display: flex; justify-content: center; gap: 1rem; border-top: 1px solid var(--border-color); padding-top: 2rem; }
+
     .loading-container { text-align: center; padding: 5rem 0; color: var(--text-muted); }
     .spinner { width: 40px; height: 40px; border: 3px solid var(--border-color); border-top-color: var(--accent-primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.5rem; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -164,10 +250,12 @@ export class ExamSessionComponent implements OnInit {
   examId = signal<number>(0);
   session = signal<StartSessionResponse | null>(null);
   result = signal<SessionResult | null>(null);
+  review = signal<DetailedSession | null>(null);
   error = signal<string>('');
   currentIndex = 0;
   submitted = false;
   answers: Record<number, number | null> = {};
+  revealed: Record<number, RevealAnswerResponse | null> = {};
   lastSaved = signal<Date | null>(null);
 
   constructor(
@@ -178,7 +266,7 @@ export class ExamSessionComponent implements OnInit {
     effect(() => {
       const learner = this.learnerService.learner();
       const id = this.examId();
-      if (learner && id && !this.session()) {
+      if (learner && id && !this.session() && !this.result()) {
         this.start(learner.id, id);
       }
     });
@@ -214,6 +302,17 @@ export class ExamSessionComponent implements OnInit {
   pick(questionId: number, optionId: number | null): void {
     this.answers[questionId] = optionId;
     this.syncProgress();
+  }
+
+  showAnswer(): void {
+    const sess = this.session();
+    const q = this.currentQuestion;
+    if (!sess || !q || !q.id) return;
+
+    this.api.revealAnswer(sess.session_id, q.id).subscribe({
+      next: (res) => this.revealed[q.id!] = res,
+      error: (err) => console.error('Reveal failed', err)
+    });
   }
 
   prev(): void {
@@ -262,6 +361,16 @@ export class ExamSessionComponent implements OnInit {
         this.submitted = true;
       },
       error: (err) => this.error.set('Submission failed. Please try again.')
+    });
+  }
+
+  loadReview(): void {
+    const sessId = this.result()?.session_id;
+    if (!sessId) return;
+
+    this.api.getDetailedSession(sessId).subscribe({
+      next: (data) => this.review.set(data),
+      error: (err) => this.error.set('Failed to load detailed review.')
     });
   }
 }

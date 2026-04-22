@@ -126,3 +126,37 @@ export interface InProgressSession {
     total_questions: number;
   };
 }
+
+export interface DetailedSession {
+  session: {
+    id: number;
+    score: number;
+    correct_answers: number;
+    total_questions: number;
+    submitted_at: string;
+  };
+  exam: {
+    id: number;
+    title: string;
+    questions: Array<{
+      id: number;
+      topic_name: string;
+      question_text: string;
+      explanation: string | null;
+      difficulty: string;
+      selected_option_id: number | null;
+      is_correct: boolean;
+      options: Array<{
+        id: number;
+        option_text: string;
+        is_correct: boolean;
+      }>;
+    }>;
+  };
+}
+
+export interface RevealAnswerResponse {
+  question_id: number;
+  explanation: string | null;
+  correct_option_id: number;
+}

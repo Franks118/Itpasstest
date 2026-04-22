@@ -116,14 +116,15 @@ import { LearnerService } from '../core/learner.service';
 export class HomeComponent implements OnInit {
   exams = signal<Exam[]>([]);
   inProgressSessions = signal<InProgressSession[]>([]);
-  selectedMode = signal<'quick' | 'long' | 'shuffle' | 'full'>('quick');
+  selectedMode = signal<'quick' | 'long' | 'shuffle' | 'full' | 'mastery'>('quick');
   error = signal<string>('');
   
-  modes: Array<{ id: 'quick' | 'long' | 'shuffle' | 'full', label: string }> = [
+  modes: Array<{ id: 'quick' | 'long' | 'shuffle' | 'full' | 'mastery', label: string }> = [
     { id: 'quick', label: 'Quick Recap' },
     { id: 'long', label: 'Long Quest' },
     { id: 'shuffle', label: 'Shuffle' },
-    { id: 'full', label: 'Full PDF' }
+    { id: 'full', label: 'Full PDF' },
+    { id: 'mastery', label: 'Domain Mastery' }
   ];
 
   constructor(
@@ -156,6 +157,7 @@ export class HomeComponent implements OnInit {
     if (title.includes('Quick')) return 'Quick';
     if (title.includes('Long')) return 'Long';
     if (title.includes('Shuffle')) return 'Shuffle';
+    if (title.includes('Mastery')) return 'Mastery';
     return 'Full';
   }
 
@@ -166,6 +168,7 @@ export class HomeComponent implements OnInit {
       if (currentMode === 'quick') return t.includes('Quick');
       if (currentMode === 'long') return t.includes('Long');
       if (currentMode === 'shuffle') return t.includes('Shuffle');
+      if (currentMode === 'mastery') return t.includes('Mastery');
       return t.includes('Full');
     });
   }

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Exam, InProgressSession, Learner, ProgressSummary, SessionResult, StartSessionResponse, Topic } from './api.types';
+import { Exam, InProgressSession, Learner, ProgressSummary, SessionResult, StartSessionResponse, Topic, DetailedSession, RevealAnswerResponse } from './api.types';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -58,6 +58,14 @@ export class ApiService {
     return this.http.post<SessionResult>(`${this.baseUrl}/sessions/${sessionId}/submit`, {
       answers,
     });
+  }
+
+  getDetailedSession(sessionId: number): Observable<DetailedSession> {
+    return this.http.get<DetailedSession>(`${this.baseUrl}/sessions/${sessionId}/detailed`);
+  }
+
+  revealAnswer(sessionId: number, questionId: number): Observable<RevealAnswerResponse> {
+    return this.http.get<RevealAnswerResponse>(`${this.baseUrl}/sessions/${sessionId}/questions/${questionId}/reveal`);
   }
 
   getInProgressSessions(userId: number): Observable<InProgressSession[]> {

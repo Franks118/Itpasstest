@@ -261,6 +261,74 @@ class ExamSessionController extends Controller
         ]);
     }
 
+    public function revealAnswer(ExamSession $session, int $questionId): JsonResponse
+    {
+        if ($session->status !== 'in_progress') {
+            return response()->json([
+                'message' => 'Answer revelation is only for active sessions.',
+            ], 403);
+        }
+
+        $question = $session->exam->questions()
+            ->with('options')
+            ->findOrFail($questionId);
+
+        return response()->json([
+            'question_id' => $question->id,
+            'explanation' => $question->explanation,
+            'correct_option_id' => $question->options->firstWhere('is_correct', true)?->id,
+        ]);
+    }
+
+    public function showDetailed(ExamSession $session): JsonResponse
+    {
+        if ($session->status !== 'submitted') {
+            return response()->json([
+                'message' => 'Detailed review is only available for submitted sessions.',
+            ], 403);
+        }
+
+        $exam = $session->exam()->with([
+            'questions' => fn ($query) => $query->orderBy('order_index'),
+            'questions.topic:id,name',
+            'questions.options' => fn ($query) => $query->orderBy('order_index'),
+        ])->firstOrFail();
+
+        $questions = $this->sortQuestionsByOrder($exam->questions, $session->question_order);
+        $userAnswers = $session->answers->keyBy('question_id');
+
+        return response()->json([
+            'session' => [
+                'id' => $session->id,
+                'score' => (float) $session->score,
+                'correct_answers' => $session->correct_answers,
+                'total_questions' => $session->total_questions,
+                'submitted_at' => $session->submitted_at,
+            ],
+            'exam' => [
+                'id' => $exam->id,
+                'title' => $exam->title,
+                'questions' => $questions->map(function ($question) use ($userAnswers) {
+                    $userAnswer = $userAnswers->get($question->id);
+                    return [
+                        'id' => $question->id,
+                        'topic_name' => $question->topic?->name,
+                        'question_text' => $question->question_text,
+                        'explanation' => $question->explanation,
+                        'difficulty' => $question->difficulty,
+                        'selected_option_id' => $userAnswer?->question_option_id,
+                        'is_correct' => (bool) $userAnswer?->is_correct,
+                        'options' => $question->options->map(fn ($option) => [
+                            'id' => $option->id,
+                            'option_text' => $option->option_text,
+                            'is_correct' => $option->is_correct,
+                        ]),
+                    ];
+                }),
+            ],
+        ]);
+    }
+
     private function buildSessionPayload(ExamSession $session, Exam $exam, Collection $questions, bool $resumed): array
     {
         return [

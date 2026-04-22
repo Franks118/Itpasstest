@@ -18,6 +18,8 @@ Route::get('/learners/{id}', [LearnerController::class, 'show']);
 Route::post('/sessions/start', [ExamSessionController::class, 'start']);
 Route::post('/sessions/{session}/progress', [ExamSessionController::class, 'saveProgress']);
 Route::post('/sessions/{session}/submit', [ExamSessionController::class, 'submit']);
+Route::get('/sessions/{session}/detailed', [ExamSessionController::class, 'showDetailed']);
+Route::get('/sessions/{session}/questions/{questionId}/reveal', [ExamSessionController::class, 'revealAnswer']);
 Route::get('/users/{userId}/sessions/in-progress', [ExamSessionController::class, 'indexInProgress']);
 
 Route::get('/users/{userId}/progress', [ProgressController::class, 'show']);
