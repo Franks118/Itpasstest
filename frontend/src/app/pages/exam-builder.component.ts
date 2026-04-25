@@ -1,14 +1,15 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
-import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, OnInit, signal, computed } from '@angular/core';
+import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators, AbstractControl } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { ApiService } from '../core/api.service';
 import { Topic } from '../core/api.types';
 
 @Component({
   selector: 'app-exam-builder',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, MatPaginatorModule],
   template: `
     <section class="page">
       <div class="card top">
@@ -26,9 +27,24 @@ import { Topic } from '../core/api.types';
           <label>Duration (minutes) <input class="input" type="number" formControlName="duration_minutes" min="1" /></label>
         </div>
 
-        <h3>Questions</h3>
+        <div class="questions-header">
+          <h3>Questions ({{ questions.length }})</h3>
+          <mat-paginator *ngIf="questions.length > pageSize()"
+            [length]="questions.length"
+            [pageSize]="pageSize()"
+            [pageSizeOptions]="[5, 10, 20]"
+            (page)="onPageChange($event)"
+            aria-label="Select page of questions">
+          </mat-paginator>
+        </div>
+
         <div formArrayName="questions">
-          <div *ngFor="let question of questions.controls; let qIndex = index" [formGroupName]="qIndex" class="question-card">
+          <div *ngFor="let question of paginatedQuestions(); let i = index" [formGroupName]="getGlobalIndex(i)" class="question-card">
+            <div class="question-header-row">
+              <h4>Question #{{ getGlobalIndex(i) + 1 }}</h4>
+              <button class="btn btn-secondary btn-sm" type="button" (click)="removeQuestion(getGlobalIndex(i))">Remove</button>
+            </div>
+
             <label>
               Topic
               <select class="input" formControlName="topic_id">
@@ -49,42 +65,73 @@ import { Topic } from '../core/api.types';
             </label>
 
             <div formArrayName="options">
-              <h4>Options</h4>
-              <div *ngFor="let _ of options(qIndex).controls; let oIndex = index" [formGroupName]="oIndex" class="option-row">
+              <h5>Options</h5>
+              <div *ngFor="let _ of options(getGlobalIndex(i)).controls; let oIndex = index" [formGroupName]="oIndex" class="option-row">
                 <input class="input" type="text" formControlName="option_text" placeholder="Option text" />
-                <label class="correct"><input type="radio" [name]="'correct-' + qIndex" [checked]="options(qIndex).at(oIndex).value.is_correct" (change)="setCorrect(qIndex, oIndex)" /> Correct</label>
+                <label class="correct">
+                  <input type="radio" 
+                         [name]="'correct-' + getGlobalIndex(i)" 
+                         [checked]="options(getGlobalIndex(i)).at(oIndex).value.is_correct" 
+                         (change)="setCorrect(getGlobalIndex(i), oIndex)" /> 
+                  Correct
+                </label>
               </div>
-            </div>
-
-            <div class="actions">
-              <button class="btn btn-secondary" type="button" (click)="addOption(qIndex)">Add Option</button>
-              <button class="btn btn-secondary" type="button" (click)="removeQuestion(qIndex)">Remove Question</button>
+              <button class="btn btn-secondary btn-sm" type="button" (click)="addOption(getGlobalIndex(i))">Add Option</button>
             </div>
           </div>
         </div>
 
-        <p class="actions">
+        <div class="pagination-footer-builder" *ngIf="questions.length > pageSize()">
+          <mat-paginator
+            [length]="questions.length"
+            [pageSize]="pageSize()"
+            [pageSizeOptions]="[5, 10, 20]"
+            [pageIndex]="pageIndex()"
+            (page)="onPageChange($event)"
+            aria-label="Select page of questions">
+          </mat-paginator>
+        </div>
+
+        <div class="form-actions">
           <button class="btn btn-secondary" type="button" (click)="addQuestion()">Add Question</button>
+          <div class="spacer"></div>
+          <a routerLink="/" class="btn btn-link">Back</a>
           <button class="btn btn-primary" type="submit">Save Test</button>
-          <a routerLink="/">Back</a>
-        </p>
+        </div>
       </form>
     </section>
   `,
   styles: [`
     .page { display: grid; gap: 1rem; }
     .top { display: grid; gap: 0.5rem; }
-    .hint { color: var(--muted-text); }
+    .hint { color: var(--text-muted); }
     .ok { color: var(--success-text); border-color: var(--success-border); background: var(--success-bg); }
     .error { color: var(--error-text); }
     .form { display: grid; gap: 1rem; }
     .base { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; }
     .base label:nth-child(3) { grid-column: 1 / -1; }
-    .question-card { border: 1px solid var(--border-color); border-radius: 12px; padding: 0.9rem; margin-bottom: 0.85rem; display: grid; gap: 0.7rem; background: var(--option-bg); }
-    .option-row { display: grid; grid-template-columns: 1fr auto; gap: 0.55rem; align-items: center; margin-bottom: 0.4rem; }
-    .correct { white-space: nowrap; display: flex; align-items: center; gap: 0.35rem; }
-    .actions { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
-    label { display: grid; gap: 0.35rem; }
+    
+    .questions-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+    .question-card { border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; display: grid; gap: 0.75rem; background: var(--surface-bg); }
+    .question-header-row { display: flex; justify-content: space-between; align-items: center; }
+    
+    .option-row { display: grid; grid-template-columns: 1fr auto; gap: 0.75rem; align-items: center; margin-bottom: 0.5rem; }
+    .correct { white-space: nowrap; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+    
+    .form-actions { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem; }
+    .spacer { flex: 1; }
+    .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8rem; }
+    .btn-link { text-decoration: none; color: var(--text-muted); }
+    
+    label { display: grid; gap: 0.35rem; font-weight: 600; font-size: 0.9rem; }
+    h4, h5 { margin: 0; }
+    
+    mat-paginator { 
+      background: var(--surface-bg); 
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+      border: none;
+    }
   `]
 })
 export class ExamBuilderComponent implements OnInit {
@@ -92,6 +139,9 @@ export class ExamBuilderComponent implements OnInit {
   message = '';
   error = '';
   form: FormGroup;
+
+  pageIndex = signal(0);
+  pageSize = signal(5);
 
   constructor(
     private readonly fb: FormBuilder,
@@ -118,6 +168,20 @@ export class ExamBuilderComponent implements OnInit {
     return this.form.get('questions') as FormArray;
   }
 
+  paginatedQuestions(): AbstractControl[] {
+    const start = this.pageIndex() * this.pageSize();
+    return this.questions.controls.slice(start, start + this.pageSize());
+  }
+
+  getGlobalIndex(localIndex: number): number {
+    return (this.pageIndex() * this.pageSize()) + localIndex;
+  }
+
+  onPageChange(event: PageEvent): void {
+    this.pageIndex.set(event.pageIndex);
+    this.pageSize.set(event.pageSize);
+  }
+
   options(questionIndex: number): FormArray {
     return this.questions.at(questionIndex).get('options') as FormArray;
   }
@@ -133,10 +197,19 @@ export class ExamBuilderComponent implements OnInit {
       ]),
     });
     this.questions.push(question);
+    
+    // Switch to the last page to show the new question
+    const lastPage = Math.floor((this.questions.length - 1) / this.pageSize());
+    this.pageIndex.set(lastPage);
   }
 
   removeQuestion(index: number): void {
     this.questions.removeAt(index);
+    // Adjust page index if the current page becomes empty
+    const maxPage = Math.max(0, Math.ceil(this.questions.length / this.pageSize()) - 1);
+    if (this.pageIndex() > maxPage) {
+      this.pageIndex.set(maxPage);
+    }
   }
 
   addOption(questionIndex: number): void {

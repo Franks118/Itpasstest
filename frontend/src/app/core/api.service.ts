@@ -1,11 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, catchError } from 'rxjs';
 import { Exam, InProgressSession, Learner, ProgressSummary, SessionResult, StartSessionResponse, Topic, DetailedSession, RevealAnswerResponse } from './api.types';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
-  private readonly baseUrl = 'http://127.0.0.1:8000/api';
+  private readonly baseUrl = 'http://localhost:8001/api';
   private readonly learnerIdKey = 'itpassport.learnerUserId';
 
   constructor(private readonly http: HttpClient) {}
@@ -31,7 +31,14 @@ export class ApiService {
   }
 
   getLearner(id: number): Observable<Learner> {
-    return this.http.get<Learner>(`${this.baseUrl}/learners/${id}`);
+    return this.http.get<Learner>(`${this.baseUrl}/learners/${id}`).pipe(
+      catchError((err) => {
+        if (err.status === 404) {
+          localStorage.removeItem(this.learnerIdKey);
+        }
+        throw err;
+      })
+    );
   }
 
   startSession(userId: number, examId: number): Observable<StartSessionResponse> {
@@ -62,6 +69,10 @@ export class ApiService {
 
   getDetailedSession(sessionId: number): Observable<DetailedSession> {
     return this.http.get<DetailedSession>(`${this.baseUrl}/sessions/${sessionId}/detailed`);
+  }
+
+  getAnswerKey(examId: number): Observable<DetailedSession> {
+    return this.http.get<DetailedSession>(`${this.baseUrl}/exams/${examId}/answer-key`);
   }
 
   revealAnswer(sessionId: number, questionId: number): Observable<RevealAnswerResponse> {

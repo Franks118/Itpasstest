@@ -12,7 +12,7 @@ class LearnerController extends Controller
     public function store(Request $request): JsonResponse
     {
         $learner = Learner::query()->create([
-            'name' => 'Learner ' . rand(1000, 9999),
+            'name' => $request->input('name', 'Learner ' . rand(1000, 9999)),
             'session_number' => 1,
             'score' => 0,
             'timestamp' => now(),

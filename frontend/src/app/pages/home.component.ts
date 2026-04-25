@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, effect, signal } from '@angular/core';
+import { Component, OnInit, effect, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { ApiService } from '../core/api.service';
 import { Exam, InProgressSession } from '../core/api.types';
 import { LearnerService } from '../core/learner.service';
@@ -9,7 +10,7 @@ import { LearnerService } from '../core/learner.service';
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, MatPaginatorModule],
   template: `
     <section class="home-page">
       <div class="welcome-card card">
@@ -47,7 +48,7 @@ import { LearnerService } from '../core/learner.service';
           <div class="mode-tabs">
             <button *ngFor="let mode of modes" 
                     [class.active]="selectedMode() === mode.id" 
-                    (click)="selectedMode.set(mode.id)">
+                    (click)="onModeChange(mode.id)">
               {{ mode.label }}
             </button>
           </div>
@@ -55,8 +56,8 @@ import { LearnerService } from '../core/learner.service';
 
         <p *ngIf="error()" class="error card">{{ error() }}</p>
 
-        <div class="exam-grid" *ngIf="filteredExams.length > 0">
-          <article class="card exam-card" *ngFor="let exam of filteredExams">
+        <div class="exam-grid" *ngIf="paginatedExams().length > 0">
+          <article class="card exam-card" *ngFor="let exam of paginatedExams()">
             <div class="exam-header">
               <h3>{{ exam.title }}</h3>
               <span class="pill">{{ modeLabel(exam.title) }}</span>
@@ -72,11 +73,24 @@ import { LearnerService } from '../core/learner.service';
                 {{ exam.duration_minutes }} Mins
               </div>
             </div>
-            <a [routerLink]="['/take-test', exam.id]" class="btn btn-secondary start-btn">Start Test</a>
+            <div class="exam-actions">
+              <a [routerLink]="['/take-test', exam.id]" class="btn btn-primary start-btn">Start Test</a>
+              <a [routerLink]="['/answer-key', exam.id]" class="btn btn-secondary review-btn">View Answers</a>
+            </div>
           </article>
         </div>
 
-        <div *ngIf="filteredExams.length === 0" class="empty-state card">
+        <div class="pagination-footer" *ngIf="filteredExams().length > pageSize()">
+          <mat-paginator
+            [length]="filteredExams().length"
+            [pageSize]="pageSize()"
+            [pageSizeOptions]="[6, 12, 24]"
+            (page)="onPageChange($event)"
+            aria-label="Select page of exams">
+          </mat-paginator>
+        </div>
+
+        <div *ngIf="filteredExams().length === 0" class="empty-state card">
           <p>Loading tests or no tests match the selected mode.</p>
         </div>
       </div>
@@ -110,7 +124,23 @@ import { LearnerService } from '../core/learner.service';
     .exam-desc { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; flex: 1; }
     .exam-meta { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
     .meta-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted); font-weight: 500; }
-    .start-btn { text-align: center; text-decoration: none; }
+    .exam-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: auto; }
+    .start-btn, .review-btn { text-align: center; text-decoration: none; padding: 0.75rem 0.5rem; font-size: 0.85rem; }
+
+    .pagination-footer { 
+      margin-top: 3rem; 
+      display: flex; 
+      justify-content: center; 
+    }
+    mat-paginator { 
+      background: var(--surface-bg); 
+      border-radius: 99px;
+      box-shadow: var(--shadow-md);
+      border: none;
+      padding: 0 1rem;
+      font-size: 0.85rem;
+      min-height: 48px;
+    }
   `]
 })
 export class HomeComponent implements OnInit {
@@ -118,6 +148,9 @@ export class HomeComponent implements OnInit {
   inProgressSessions = signal<InProgressSession[]>([]);
   selectedMode = signal<'quick' | 'long' | 'shuffle' | 'full' | 'mastery' | 'philnits'>('quick');
   error = signal<string>('');
+
+  pageIndex = signal(0);
+  pageSize = signal(6);
   
   modes: Array<{ id: 'quick' | 'long' | 'shuffle' | 'full' | 'mastery' | 'philnits', label: string }> = [
     { id: 'quick', label: 'Quick Recap' },
@@ -127,6 +160,24 @@ export class HomeComponent implements OnInit {
     { id: 'mastery', label: 'Domain Mastery' },
     { id: 'philnits', label: 'PhilNITS Focus' }
   ];
+
+  filteredExams = computed(() => {
+    const currentMode = this.selectedMode();
+    return this.exams().filter((exam) => {
+      const t = exam.title;
+      if (currentMode === 'quick') return t.includes('Quick');
+      if (currentMode === 'long') return t.includes('Long');
+      if (currentMode === 'shuffle') return t.includes('Shuffle');
+      if (currentMode === 'mastery') return t.includes('Mastery');
+      if (currentMode === 'philnits') return t.includes('PhilNITS');
+      return t.includes('Full');
+    });
+  });
+
+  paginatedExams = computed(() => {
+    const start = this.pageIndex() * this.pageSize();
+    return this.filteredExams().slice(start, start + this.pageSize());
+  });
 
   constructor(
     private readonly api: ApiService,
@@ -147,6 +198,16 @@ export class HomeComponent implements OnInit {
     });
   }
 
+  onModeChange(modeId: 'quick' | 'long' | 'shuffle' | 'full' | 'mastery' | 'philnits'): void {
+    this.selectedMode.set(modeId);
+    this.pageIndex.set(0); // Reset to first page on mode change
+  }
+
+  onPageChange(event: PageEvent): void {
+    this.pageIndex.set(event.pageIndex);
+    this.pageSize.set(event.pageSize);
+  }
+
   loadInProgress(userId: number): void {
     this.api.getInProgressSessions(userId).subscribe({
       next: (sessions) => this.inProgressSessions.set(sessions),
@@ -161,18 +222,5 @@ export class HomeComponent implements OnInit {
     if (title.includes('Mastery')) return 'Mastery';
     if (title.includes('PhilNITS')) return 'PhilNITS';
     return 'Full';
-  }
-
-  get filteredExams(): Exam[] {
-    const currentMode = this.selectedMode();
-    return this.exams().filter((exam) => {
-      const t = exam.title;
-      if (currentMode === 'quick') return t.includes('Quick');
-      if (currentMode === 'long') return t.includes('Long');
-      if (currentMode === 'shuffle') return t.includes('Shuffle');
-      if (currentMode === 'mastery') return t.includes('Mastery');
-      if (currentMode === 'philnits') return t.includes('PhilNITS');
-      return t.includes('Full');
-    });
   }
 }

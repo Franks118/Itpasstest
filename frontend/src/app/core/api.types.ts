@@ -128,7 +128,7 @@ export interface InProgressSession {
 }
 
 export interface DetailedSession {
-  session: {
+  session?: {
     id: number;
     score: number;
     correct_answers: number;

@@ -125,7 +125,7 @@ import { LearnerService } from '../core/learner.service';
       <div *ngIf="review() as data" class="review-container">
         <header class="review-header-meta">
           <h1>Review: {{ data.exam.title }}</h1>
-          <div class="review-summary-pill pill">
+          <div class="review-summary-pill pill" *ngIf="data.session">
             {{ data.session.correct_answers }}/{{ data.session.total_questions }} ({{ data.session.score }}%)
           </div>
         </header>
@@ -211,7 +211,25 @@ import { LearnerService } from '../core/learner.service';
     .pill.success { background: var(--success-bg); color: var(--success-text); }
     .explanation { font-size: 0.95rem; color: var(--text-muted); line-height: 1.6; }
 
-    .exam-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 3rem; }
+    .exam-footer { 
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface-bg);
+      padding: 1rem 2rem;
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+      z-index: 100;
+      border: none;
+    }
+    
+    .exam-container {
+      padding-bottom: 100px;
+    }
+
     .footer-left { display: flex; gap: 0.75rem; }
     .reveal-btn { color: var(--accent-primary); border-color: var(--accent-primary); }
     .reveal-btn:hover { background: var(--accent-soft); }

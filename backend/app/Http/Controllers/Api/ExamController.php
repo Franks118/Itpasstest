@@ -29,10 +29,43 @@ class ExamController extends Controller
             'creator:id,name',
             'questions' => fn ($query) => $query->orderBy('order_index'),
             'questions.topic:id,name,major_category,middle_category',
-            'questions.options' => fn ($query) => $query->orderBy('order_index'),
+            'questions.options',
         ]);
 
+        $exam->questions->each(function ($question) {
+            $question->setRelation('options', $question->options->shuffle()->values());
+        });
+
         return response()->json($exam);
+    }
+
+    public function answerKey(Exam $exam): JsonResponse
+    {
+        $exam->load([
+            'questions' => fn ($query) => $query->orderBy('order_index'),
+            'questions.topic:id,name',
+            'questions.options',
+        ]);
+
+        return response()->json([
+            'exam' => [
+                'id' => $exam->id,
+                'title' => $exam->title,
+                'questions' => $exam->questions->map(fn ($q) => [
+                    'id' => $q->id,
+                    'topic_name' => $q->topic?->name,
+                    'question_text' => $q->question_text,
+                    'explanation' => $q->explanation,
+                    'difficulty' => $q->difficulty,
+                    'options' => $q->options->map(fn ($o) => [
+                        'id' => $o->id,
+                        'option_text' => $o->option_text,
+                        'is_correct' => $o->is_correct,
+                    ]),
+                    'correct_option_id' => $q->options->firstWhere('is_correct', true)?->id,
+                ]),
+            ],
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -105,6 +138,10 @@ class ExamController extends Controller
             'questions.options',
             'questions.topic:id,name,major_category,middle_category',
         ]);
+
+        $exam->questions->each(function ($question) {
+            $question->setRelation('options', $question->options->shuffle()->values());
+        });
 
         return response()->json($exam, 201);
     }

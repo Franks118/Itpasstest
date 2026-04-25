@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/topics', [TopicController::class, 'index']);
 Route::get('/exams', [ExamController::class, 'index']);
 Route::get('/exams/{exam}', [ExamController::class, 'show']);
+Route::get('/exams/{exam}/answer-key', [ExamController::class, 'answerKey']);
 Route::post('/exams', [ExamController::class, 'store']);
 
 Route::post('/learners', [LearnerController::class, 'store']);

@@ -35,7 +35,7 @@ class ExamSessionController extends Controller
             ->with([
                 'questions' => fn ($query) => $query->orderBy('order_index'),
                 'questions.topic:id,name,major_category,middle_category',
-                'questions.options' => fn ($query) => $query->orderBy('order_index'),
+                'questions.options',
             ])
             ->findOrFail($validated['exam_id']);
 
@@ -291,7 +291,7 @@ class ExamSessionController extends Controller
         $exam = $session->exam()->with([
             'questions' => fn ($query) => $query->orderBy('order_index'),
             'questions.topic:id,name',
-            'questions.options' => fn ($query) => $query->orderBy('order_index'),
+            'questions.options',
         ])->firstOrFail();
 
         $questions = $this->sortQuestionsByOrder($exam->questions, $session->question_order);
@@ -318,7 +318,7 @@ class ExamSessionController extends Controller
                         'difficulty' => $question->difficulty,
                         'selected_option_id' => $userAnswer?->question_option_id,
                         'is_correct' => (bool) $userAnswer?->is_correct,
-                        'options' => $question->options->map(fn ($option) => [
+                        'options' => $question->options->shuffle()->values()->map(fn ($option) => [
                             'id' => $option->id,
                             'option_text' => $option->option_text,
                             'is_correct' => $option->is_correct,
@@ -351,7 +351,7 @@ class ExamSessionController extends Controller
                     'question_text' => $question->question_text,
                     'difficulty' => $question->difficulty,
                     'order_index' => $index + 1,
-                    'options' => $question->options->map(fn ($option) => [
+                    'options' => $question->options->shuffle()->values()->map(fn ($option) => [
                         'id' => $option->id,
                         'option_text' => $option->option_text,
                         'order_index' => $option->order_index,

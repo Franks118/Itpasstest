@@ -144,6 +144,57 @@ button, .btn {
   color: var(--text-muted);
 }
 
+.learner-identity {
+  margin: 0.5rem 0 1rem;
+}
+
+.name-display-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.learner-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+.btn-link-sm {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  padding: 0;
+  cursor: pointer;
+}
+
+.btn-link-sm:hover {
+  color: var(--accent-primary);
+}
+
+.name-edit-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.name-input {
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--accent-primary);
+  background: var(--surface-bg);
+  color: var(--text-main);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.btn-sm {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+}
+
 .error {
   color: var(--error-text);
   font-size: 0.875rem;
